@@ -2,11 +2,16 @@
     <div class="container">
         <hr>
         <div class="row">
-            <div class="col-sm-12">
+            <div class="col-sm-8">
                 <textarea readonly name="" class="form-control" id="" cols="30" rows="10">{{ messages.join('\n') }}</textarea>
                 <hr>
                 <input type="text" class="form-control" v-model="textMessage" @keyup.enter="sendMessage" @keydown="actionUser">
                 <span v-if="isActive">{{ isActive.name }} набирает сообщение</span>
+            </div>
+            <div class="col-sm-4">
+                <ul>
+                    <li v-for="user in activeUsers">{{ user}}</li>
+                </ul>
             </div>
         </div>
     </div>
@@ -17,7 +22,7 @@
         props: ['room', 'user'],
         computed: {
             channel() {
-                return window.Echo.private('room.' + this.room.id)
+                return window.Echo.join('room.' + this.room.id)
             }
         },
         data() {
@@ -26,12 +31,26 @@
                 textMessage: '',
                 isActive: false,
                 typingTimer: false,
+                activeUsers: [],
             }
         },
         mounted() {
             console.log(this.room)
-            this.channel.listen('PrivateChat', ({data}) => {
-                this.messages.push(data.body)
+            this.channel
+                //для получения данных нужно вернуть их из маршрута в channel
+                //виспер без редиса работает и кто в канале тоже
+                //через лару только подключение к каналу
+                .here((users) => {
+                    this.activeUsers = users
+                })
+                .joining((user)=>{
+                    this.activeUsers.push(user)
+                })
+                .leaving((user)=>{
+                    this.activeUsers.splice(this.activeUsers.indexOf(user), 1)
+                })
+                .listen('PrivateChat', ({data}) => {
+                this.messages.push(data.body);
                 this.isActive = false;
             }).listenForWhisper('typing', (e) => {
                 this.isActive = e;
